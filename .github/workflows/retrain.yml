@@ -1,0 +1,33 @@
+name: Model Retraining
+on:
+  schedule:
+    - cron: "0 0 * * 0" # Weekly retraining
+  workflow_dispatch:
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    container:
+      image: your-custom-ml-image:latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Sync data
+        run: |
+          python -m data_pipeline.main \
+            --postgres-uri ${{ secrets.POSTGRES_URI }} \
+            --minio-endpoint ${{ secrets.MINIO_ENDPOINT }}
+      
+      - name: Train models
+        run: |
+          python -m models.prophet_forecaster \
+            --input /data/processed/features.parquet
+          python -m models.xgb_trainer \
+            --input /data/processed/train.parquet
+      
+      - name: Evaluate models
+        run: |
+          python -m validation.evaluate \
+            --threshold 0.85 \
+            --mlflow-uri ${{ secrets.MLFLOW_URI }}
